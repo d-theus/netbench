@@ -33,7 +33,8 @@ module MyPerf
 			puts "This is MyPerf server. TCP-based bandwidth tester."
 			puts "Listening on port #{@port}. Accepting up to #{@accepts} clients."
 			threads = []
-			@s.listen(@accepts.to_i)
+			#@s.listen(@accepts.to_i)
+			@s.listen(10)
 			while true
 				begin
 					cs, ca = @s.accept
@@ -53,8 +54,8 @@ module MyPerf
 						end
 						puts "End"
 					end
-					th.join
 					threads << th
+					th.join
 				rescue Errno::EBADF
 				rescue Errno::ECONNRESET, Errno::EPIPE, IOError
 					cs.close unless cs.nil?
@@ -80,6 +81,8 @@ module MyPerf
 					puts "Quitting"
 					exit
 				end
+			rescue Errno::ETIMEDOUT
+				puts "Server not responding"
 			end
 		end
 
