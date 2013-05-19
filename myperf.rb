@@ -21,7 +21,7 @@ module MyPerf
 			@s.setsockopt Socket::SOL_SOCKET, Socket::SO_RCVTIMEO, timeval
 			@s.setsockopt Socket::SOL_SOCKET, Socket::SO_SNDTIMEO, timeval
 			@s.setsockopt Socket::IPPROTO_TCP, Socket::TCP_NODELAY,1 
-			@s.bind(Addrinfo.tcp '127.0.0.1', @port)
+			@s.bind(Addrinfo.tcp '', @port)
 			Signal.trap("INT") do
 				puts "Shutting down"
 				self.finalize
@@ -119,6 +119,7 @@ module MyPerf
 							while  (msg.lstrip.rstrip =~ /#{MyPerf::M_END}/).nil? 
 								msg = @s.gets
 							end
+							Ncurses.mvaddstr 8,5, "End reached #{Time::now}"
 							tval = Time::now - tmstmp
 							Ncurses.mvaddstr 5,5,"Avg. tranfer speed: #{(MyPerf::MsgSize * MyPerf::M_COUNT)/tval/1024} Kbps" + "\n"
 							Ncurses.stdscr.refresh
