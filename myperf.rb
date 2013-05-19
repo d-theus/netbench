@@ -19,6 +19,8 @@ module MyPerf
 			@s = Socket.new :INET, :STREAM, 0
 			timeval = [1, 0].pack("l_2")
 			@s.setsockopt Socket::SOL_SOCKET, Socket::SO_RCVTIMEO, timeval
+			@s.setsockopt Socket::SOL_SOCKET, Socket::SO_SNDTIMEO, timeval
+			@s.setsockopt Socket::IPPROTO_TCP, Socket::TCP_NODELAY,1 
 			@s.bind(Addrinfo.tcp '127.0.0.1', @port)
 			Signal.trap("INT") do
 				puts "Shutting down"
@@ -32,13 +34,11 @@ module MyPerf
 		def start
 			puts "This is MyPerf server. TCP-based bandwidth tester."
 			puts "Listening on port #{@port}. Accepting up to #{@accepts} clients."
-			threads = []
-			#@s.listen(@accepts.to_i)
-			@s.listen(10)
+			@s.listen(@accepts.to_i)
 			while true
 				begin
 					cs, ca = @s.accept
-					th =  Thread.new(cs, ca) do |cs, ca|
+					Thread.new(cs, ca) do |cs, ca|
 						puts "New client: #{ca.ip_address} : #{ca.ip_port}"
 						while true
 							unless cs.closed?
@@ -54,8 +54,6 @@ module MyPerf
 						end
 						puts "End"
 					end
-					threads << th
-					th.join
 				rescue Errno::EBADF
 				rescue Errno::ECONNRESET, Errno::EPIPE, IOError
 					cs.close unless cs.nil?
@@ -68,40 +66,47 @@ module MyPerf
 		@s
 		@ip
 		@port
-		def initialize(ip, port)
-			@s = Socket.new :INET, :STREAM, 0
-			@ip = ip
-			@port = port
-			begin
-				@s = TCPSocket.new ip, port
-				timeval = [1, 0].pack("l_2")
-				@s.setsockopt Socket::SOL_SOCKET, Socket::SO_RCVTIMEO, timeval
-				Signal.trap("INT") do
-					self.finalize
-					puts "Quitting"
-					exit
-				end
-			rescue Errno::ETIMEDOUT
-				puts "Server not responding"
-			end
-		end
-
-		def finalize
-			sleep 0.5
-			Ncurses.echo
-			Ncurses.nocbreak
-			Ncurses.nl
-			Ncurses.endwin
-			@s.close unless @s.closed? unless @s.nil?
-		end
-
-		def test 
+		def nc_init
 			Ncurses.initscr
 			Ncurses.cbreak           # provide unbuffered input
 			Ncurses.noecho           # turn off input echoing
 			Ncurses.nonl             # turn off newline translation
 			Ncurses.stdscr.intrflush(false) # turn off flush-on-interrupt
 			Ncurses.stdscr.keypad(true)     # turn on keypad mode
+			@nc_ready = true
+		end
+		def nc_deinit
+			if @nc_ready then
+				Ncurses.echo
+				Ncurses.nocbreak
+				Ncurses.nl
+				Ncurses.endwin
+			end
+		end
+
+		def initialize(ip, port, timeout)
+			Signal.trap("INT") do
+				self.finalize
+				puts "Quitting"
+				exit
+			end
+			@s = Socket.new :INET, :STREAM, 0
+			@ip = ip
+			@port = port
+			@s = TCPSocket.new ip, port
+			timeval = [timeout, 0].pack("l_2")
+			@s.setsockopt Socket::SOL_SOCKET, Socket::SO_RCVTIMEO, timeval
+			@s.setsockopt Socket::SOL_SOCKET, Socket::SO_SNDTIMEO, timeval
+		end
+
+		def finalize
+			sleep 0.5
+			nc_deinit
+			@s.close unless @s.closed? unless @s.nil?
+		end
+
+		def test 
+			nc_init
 			Ncurses.refresh
 			Ncurses.mvaddstr 1,1, "MyPerf client. Connected to #{@ip}:#{@port}"
 			while true

@@ -11,6 +11,10 @@ if __FILE__ == $0 then
 			options[:p] = o
 		end
 
+		opts.on('-t TIMEOUT', '--timeout', "Set send/rcv timeout") do |o|
+			options[:t] = o
+		end
+
 		opts.on_tail( '-h', '--help', 'Display this screen' ) do
 			puts opts
 			exit
@@ -40,10 +44,12 @@ if __FILE__ == $0 then
 	end
 
 	begin
-	c = MyPerf::Client.new ARGV[0], options[:p]||3333 
+	c = MyPerf::Client.new ARGV[0], options[:p]||3333, options[:t]||1
 	c.test
-	rescue Errno::EPIPE, Errno::ECONNREFUSED, Errno::ENOTCONN => e
+	rescue Errno::EPIPE
 		c.finalize unless c.nil?
+		puts "Other side terminated connection"
+	rescue Errno::ECONNREFUSED, Errno::ENOTCONN => e
 		puts e
 	end
 end
